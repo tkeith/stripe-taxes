@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+from sys import argv
+import csv
+from decimal import Decimal
+
+def dec(val):
+    return Decimal(val.replace(',', ''))
+
+def main():
+    if len(argv) != 2:
+        print('args: filename')
+        return
+    fn = argv[1]
+    with open(fn) as f:
+        reader = csv.reader(f, delimiter=',', quotechar='"')
+        header = next(reader)
+        assert header == 'id,Type,Source,Amount,Fee,Net,Currency,Created (UTC),Available On (UTC),Description,Customer Facing Amount,Customer Facing Currency,Transfer,Transfer Date (UTC)'.split(',')
+
+        charge_amt_total = Decimal(0)
+        charge_fee_total = Decimal(0)
+        refund_net_total = Decimal(0)
+        chargeback_lost_net_total = Decimal(0)
+
+        for row in reader:
+            id = row[0]
+            type = row[1]
+            amount = dec(row[3])
+            fee = dec(row[4])
+            net = dec(row[5])
+            desc = row[9]
+
+            if type == 'charge':
+                assert amount > 0
+                charge_amt_total += amount
+                assert fee > 0
+                charge_fee_total += fee
+            elif type == 'refund':
+                assert net < 0
+                refund_net_total -= net
+            elif type == 'transfer':
+                pass
+            elif type == 'transfer_cancel':
+                pass
+            elif type == 'transfer_failure':
+                pass
+            elif type == 'adjustment':
+                assert 'Chargeback withdrawal' in desc
+                assert net < 0
+                chargeback_lost_net_total -= net
+            else:
+                raise NotImplementedError(row)
+
+        print('Charge amount (+): {}'.format(charge_amt_total))
+        print('Charge fee (-): {}'.format(charge_fee_total))
+        print('Refund net (-): {}'.format(refund_net_total))
+        print('Chargeback lost net (-): {}'.format(chargeback_lost_net_total))
+
+if __name__ == '__main__':
+    main()
